@@ -1,0 +1,27 @@
+{
+    "name": "sohris/http",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Rdanieli",
+            "email": "rodri.merlucci@gmail.com"
+        }
+    ],
+    "repositories": [
+      {
+        "type": "vcs",
+        "url": "git@github.com:sohris/core.git"
+      }
+    ],
+    "require": {
+        "sohris/core" : "^0.1",
+        "react/http": "^1.3.0"
+    },
+    
+    "autoload": {
+        "psr-4": {
+          "Sohris\\Http\\": "src/"
+        }
+      }
+}
