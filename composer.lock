@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f84de519827eafd6a1f277549bc0c685",
+    "content-hash": "af7e9d2c84ac6f5789ba44040a88d519",
     "packages": [
         {
             "name": "evenement/evenement",
@@ -808,6 +808,41 @@
                 "issues": "https://github.com/sohris/core/issues"
             },
             "time": "2021-05-31T18:37:05+00:00"
+        },
+        {
+            "name": "sohris/thread",
+            "version": "0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/sohris/thread.git",
+                "reference": "58d63e0155cbb509a6dd303da28a1e05b70db1c9"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/sohris/thread/zipball/58d63e0155cbb509a6dd303da28a1e05b70db1c9",
+                "reference": "58d63e0155cbb509a6dd303da28a1e05b70db1c9",
+                "shasum": ""
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Sohris\\Thread\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Rdanieli",
+                    "email": "rodri.merlucci@gmail.com"
+                }
+            ],
+            "support": {
+                "source": "https://github.com/sohris/thread/tree/v0.1.0",
+                "issues": "https://github.com/sohris/thread/issues"
+            },
+            "time": "2021-06-02T14:40:07+00:00"
         }
     ],
     "packages-dev": [],

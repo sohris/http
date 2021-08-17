@@ -12,10 +12,15 @@
       {
         "type": "vcs",
         "url": "git@github.com:sohris/core.git"
+      },
+      {
+        "type": "vcs",
+        "url": "git@github.com:sohris/thread.git"
       }
     ],
     "require": {
         "sohris/core" : "^0.1",
+        "sohris/thread" : "^0.1",
         "react/http": "^1.3.0"
     },
     

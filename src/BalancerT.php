@@ -10,10 +10,11 @@ class BalancerT
 
     public function __construct(int $workers)
     {
-        //while($workers--)
-        //{
-        //    $sockets = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM,  )
-        //}
+        while($workers--)
+        {
+            $sockets = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_UDP);
+
+        }
     } 
 
     public function __invoke(ServerRequestInterface $request)

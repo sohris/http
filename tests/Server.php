@@ -1,129 +1,96 @@
-<?php 
+<?php
+include "vendor/autoload.php";
 
-class ForkException extends \RuntimeException {}
-class ModeException extends \RuntimeException {}
+use React\Http\Message\Response;
+use React\Socket\Connector;
+use Sohris\Core\Loop;
+use Sohris\Thread\Process;
+use Sohris\Thread\Thread;
 
-class Thread
-{
-    protected const READ_BUFFER = 1024 * 4;
-    protected $process;
-    protected $callback;
-    protected $child;
-    protected $parent;
+$certificateData = array(
+    "countryName" => "US",
+    "stateOrProvinceName" => "Texas",
+    "localityName" => "Houston",
+    "organizationName" => "DevDungeon.com",
+    "organizationalUnitName" => "Development",
+    "commonName" => "DevDungeon",
+    "emailAddress" => "nanodano@devdungeon.com"
+);
 
-    public function __construct(callable $process)
-    {
-        if (php_sapi_name() !== 'cli') {
-            throw new ModeException('threads are available in CLI mode only.');
-        }
+// Generate certificate
+$privateKey = openssl_pkey_new();
+$certificate = openssl_csr_new($certificateData, $privateKey);
+$certificate = openssl_csr_sign($certificate, null, $privateKey, 365);
 
-        pcntl_async_signals(true);
-        $this->process = \Closure::bind($process, $this, static::class);
-    }
+// Generate PEM file
+$pem_passphrase = 'abracadabra'; // empty for no passphrase
+$pem = array();
+openssl_x509_export($certificate, $pem[0]);
+openssl_pkey_export($privateKey, $pem[1], $pem_passphrase);
+$pem = implode($pem);
 
-    protected function respond(string $value): void
-    {
-        $write = [$this->parent];
-        echo "writing... ";
+// Save PEM file
+$pemfile = './server.pem';
+file_put_contents($pemfile, $pem);
 
-        if (stream_select($read, $write, $except, 1)) {
-            $socket = reset($write);
-            flock($socket, LOCK_EX);
-            fwrite($socket, $value);
-            flock($socket, LOCK_UN);
-            echo "done";
-            posix_kill(posix_getppid(), SIGCHLD);
-        }
-        echo "\n";
-    }
 
-    protected function receive(): void
-    {
-        if (!$this->callback) {
-            return;
-        }
-        echo "receiving... ";
+$loop = Loop::getLoop();
 
-        $read = [$this->child];
+$default_port = 50010;
+$workers_socket = [];
+$workers = 6;
+$used_ports = [];
+$threads = [];
 
-        if (stream_select($read, $write, $except, null)) {
-            $socket = reset($read);
-            flock($socket, LOCK_EX);
-            $response = '';
+for ($i = 0; $i < $workers; $i++) {
+    unset($thread1);
+    echo "creating thread $i" . PHP_EOL;
+    $port = $default_port + $i;
+    $used_ports[] = $port;
+    $thread1 = new Thread;
+    $thread1->child(function (Process $process) use ($port) {
+        $loop = Loop::newLoop();
+        $http_socket = new \React\Socket\Server("0.0.0.0:" . $port, $loop);
+        $server = new \React\Http\Server($loop, function () use ($port) {
+            return new Response(200, [], "aaaa $port");
+        });
+        $server->listen($http_socket);
 
-            do {
-                $buffer = fread($socket, static::READ_BUFFER);
-                $response .= $buffer;
-            } while (strlen($buffer) == static::READ_BUFFER);
-
-            flock($socket, LOCK_UN);
-            echo "done";
-            call_user_func($this->callback, $response);
-        } else {
-            echo "cannot read :(\n";
-        }
-        echo "\n";
-    }
-
-    public function synchronize(callable $callback): self
-    {
-        $this->callback = $callback;
-
-        return $this;
-    }
-
-    public function start(): void
-    {
-        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
-        $pid = pcntl_fork();
-
-        if ($pid == -1) {
-            throw new ForkException('Cannot fork process');
-        } elseif ($pid) {
-            // parent
-            fclose($pair[0]);
-            $this->child = $pair[1];
-
-            pcntl_signal(SIGCHLD, function () {
-                $this->receive();
-            });
-        } else {
-            fclose($pair[1]);
-            $this->parent = $pair[0];
-            call_user_func($this->process);
-            exit(0);
-        }
-    }
+        $loop->run();
+    });
+    $thread1->setName("http_worker_" . $i);
+    $threads[] = $thread1;
 }
+$connector = new Connector($loop);
+echo "Total threads => " . \count($threads) . PHP_EOL;
 
-register_shutdown_function(function () {
-    echo posix_getpid() . " process finished\n";
+$socket = new \React\Socket\Server("0.0.0.0:80", $loop);
+
+$socket->on('connection', function (React\Socket\ConnectionInterface $connection) use (&$connector, &$used_ports) {
+    $connection->on('data', function ($data) use ($connection, &$connector, &$used_ports) {
+        $next_port = \current($used_ports);
+        if (\is_null($next_port) || empty($next_port)) {
+            \reset($used_ports);
+            $next_port = \current($used_ports);
+        }
+        \next($used_ports);
+
+        $connector->connect("0.0.0.0:" . $next_port)->then(function (React\Socket\ConnectionInterface $connection2) use ($data, $connection) {
+            $connection2->on('data', function ($data2) use ($connection, $connection2) {
+                $connection->end($data2);
+                $connection2->close();
+            });
+
+            $connection2->write($data);
+        }, function ($e) {
+            echo $e->getMessage();
+        });
+    });
 });
 
-echo "main process with pid = " . posix_getpid() . "\n";
-$varFromBeginning = "begin!\n";
-
-(new Thread(function () {
-    echo "a text inside child\n";
-    usleep(1000);
-    $this->respond(str_pad("a very_long", 2000, '=') . "\n");
-    usleep(1000);
-    $this->respond("a myValue two\n");
-    usleep(1000);
-    $this->respond("a myValue three\n");
-    usleep(10000);
-    $this->respond("a myValue four\n");
-}))->synchronize(function ($response) use (&$varFromBeginning) {
-    echo $response;
-    $varFromBeginning .= $response;
-})->start();
-
-echo "after the tread\n";
-
-for ($i = 0; $i < 10; $i++) {
-    echo "$i \n";
-    usleep(100000);
+foreach ($threads as $thread) {
+    $thread->run();
 }
 
-pcntl_wait($status);
-echo "$varFromBeginning\n";
+
+$loop->run();
