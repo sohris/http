@@ -12,57 +12,58 @@ use Throwable;
 
 abstract class DRMRouter
 {
-    private static $mapper = [];
+    private  $mapper = [];
 
     public function getRoutesMapper()
     {
-        self::loadRoute($this);
+        $this->loadRoute($this);
 
-        return self::$mapper;
+        return $this->mapper;
     }
 
-    private static function loadRoute($class)
+    private  function loadRoute($class)
     {
-        if (empty(self::$mapper)) {
+        if (empty($this->mapper)) {
             $class_annotation = Utils::loadAnnotationsOfClass($class);
             foreach ($class_annotation['methods'] as $method) {
-                self::mountMethodMap($method);
+                $this->mountMethodMap($method);
             }
         }
     }
 
-    private static function mountMethodMap($method)
+    private  function mountMethodMap($method)
     {
         try {
-            self::validRouteMethod($method);
-            self::mappingRoute($method);
+            $this->validRouteMethod($method);
+            $this->mappingRoute($method);
         } catch (Throwable $e) {
+            //echo $e->getMessage();
         }
     }
 
-    private static function validRouteMethod($method)
+    private  function validRouteMethod($method)
     {
         if (empty($method['annotation']))
             throw new Exception("Not Valid Method");
     }
 
-    private static function mappingRoute($method)
+    private  function mappingRoute($method)
     {
         if (empty(array_filter($method['annotation'], fn ($annotation) => $annotation instanceof \Sohris\Http\Annotations\Route)))
             throw new Exception("Not Valid Method");
 
-        $route_hash = self::getRouteHash($method);
+        $route_hash = $this->getRouteHash($method);
 
-        self::$mapper[$route_hash] = self::configureMap($method);
+        $this->mapper[$route_hash] = $this->configureMap($method);
     }
 
-    private static function getRouteHash($method)
+    private  function getRouteHash($method)
     {
         $annotation = array_filter($method['annotation'], fn ($annotation) => $annotation instanceof \Sohris\Http\Annotations\Route)[0];
         return $annotation->getHashRoute();
     }
 
-    private static function configureMap($method)
+    private  function configureMap($method)
     {
         $mapper = new stdClass;
         $mapper->callable = $method['method']->class . "::" . $method['method']->name;
@@ -78,7 +79,6 @@ abstract class DRMRouter
                 $mapper->session_jwt = $annotation;
             }
         }
-
         return $mapper;
     }
 }
