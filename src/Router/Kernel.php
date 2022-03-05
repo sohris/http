@@ -52,7 +52,7 @@ class Kernel
     public static function getSessionJWT(string $route_hash, ServerRequestInterface $request)
     {
         $class = self::getClassOfRoute($route_hash);
-        if (isset($class->session_jwt)) {
+        if (isset($class->session_jwt) && $class->session_jwt->needAuthorization()) {
             return SessionJWT::getSession($request);
         }
         return null;

@@ -34,6 +34,11 @@ class SessionJWT
         $this->auth = $args['value'];
     }
 
+    public function needAuthorization()
+    {
+        return $this->auth;
+    }
+
     public static function getSession(ServerRequestInterface $request)
     {
         if (empty($request->getHeader('Authorization')))
