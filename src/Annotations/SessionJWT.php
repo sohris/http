@@ -31,7 +31,6 @@ class SessionJWT
         
         $config = CoreUtils::getConfigFiles('http');
         self::$key = $config['jwt_key'];
-        echo self::$key . PHP_EOL;
         $this->auth = $args['value'];
     }
 
@@ -42,9 +41,11 @@ class SessionJWT
 
         $token = explode('Bearer ', $request->getHeader('Authorization')[0])[1];
         try {
-            return JWT::decode($token, new Key(self::$key,'HS256'));
+            $jwt_session = JWT::decode($token, new Key(self::$key,'HS256'));
+            return CoreUtils::jsonDecodeUTF8($jwt_session->data);
         } catch (Exception $e) {
             throw new StatusHTTPException(json_encode(["error" => "Authorization Failed", "description" => $e->getMessage()]), 403);
         }
     }
 }
+    
