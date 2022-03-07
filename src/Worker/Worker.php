@@ -77,7 +77,7 @@ class Worker
     {
         $uri = $this->uri;
         $this->runtime->run(function ($channel) use ($uri) {
-            $log = new Logger("HTTP");
+            $log = new Logger("Http");
             try {
                 $log->debug("Starting Worker in $uri", [$uri]);
                 $loop = Loop::get();

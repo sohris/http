@@ -27,6 +27,8 @@ class Http extends AbstractComponent
 
     private $socket;
 
+    private $workers_queue;
+
     private $server;
 
     private $logger;
@@ -41,7 +43,7 @@ class Http extends AbstractComponent
     {
         $this->configs = Utils::getConfigFiles('http');
         $this->host = $this->configs['host'] . ":" . $this->configs["port"];
-        $this->workers = $this->configs['workers'] > 1 ? 1 :$this->configs['workers']; 
+        $this->workers = $this->configs['workers'] < 1 ? 1 :$this->configs['workers']; 
         $this->loop = Loop::get();
         $this->logger = new Logger('Http');
     }
@@ -63,12 +65,46 @@ class Http extends AbstractComponent
 
     public function start()
     {
-        $this->controller = new Controller($this->configs['workers']);
+
+        if ($this->workers == 1) {
+            $uri = $this->host;
+            $server = new \React\Http\HttpServer(...$this->configuredMiddlewares($uri));
+            $socket = new \React\Socket\SocketServer($uri);
+            $server->listen($socket);
+            return;
+        }
+
+        for ((int) $i = 1; $i <= $this->workers; $i++) 
+        {
+            $uri = $this->configs['host'] . ":" . (80 + $i);
+            $server = new \React\Http\HttpServer(...$this->configuredMiddlewares($uri));
+            $socket = new \React\Socket\SocketServer($uri);
+            $server->listen($socket);
+        }
     }
 
     public function getName(): string
     {
         return $this->module_name;
+    }
+
+    private function configuredMiddlewares(string $uri)
+    {
+        $configs =  Utils::getConfigFiles('http');
+
+        $array = [
+            new MiddlewareLogger($uri),
+            new Error,
+            new Cors($configs['cors_config']),
+            new LimitConcurrentRequestsMiddleware($configs['max_concurrent_requests']),
+            new RequestBodyParserMiddleware($configs['upload_files_size'], $configs['max_upload_files']),
+        ];
+
+        foreach ($this->middlewares as $middleware) {
+            array_push($array, new $middleware());
+        }
+        $array[] = new MiddlewareRouter;
+        return $array;
     }
 
 }
