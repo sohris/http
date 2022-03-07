@@ -28,10 +28,8 @@ class Error
             $promise = resolve($next($request));
             
             return $promise->then(null, function(\Exception $e){
-                var_dump($e->getMessage());
             });
         } catch (StatusHTTPException $e) {
-            var_dump($e->getMessage());
             return new Response(
                 $e->getCode(),
                 array(
@@ -40,7 +38,6 @@ class Error
                 json_encode(array("error" => $e->getCode(), "info" => $e->getMessage()))
             );
         } catch (Throwable $e) {
-            var_dump($e->getMessage());
             $this->logger->critical($e->getMessage());
             return new Response(
                 "500",

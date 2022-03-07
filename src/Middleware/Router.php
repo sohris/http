@@ -27,7 +27,6 @@ class Router
         $request->SESSION = Kernel::getSessionJWT($request->route_hash, $request);
         $promise = resolve(Kernel::callRoute($request));
         return $promise->then(null, function(Exception $e){
-            var_dump($e->getMessage());
         });
     }   
 }

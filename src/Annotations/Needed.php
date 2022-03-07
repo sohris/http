@@ -96,7 +96,6 @@ class Needed
         ) {
 
             $files = $request->getUploadedFiles();
-            var_dump($files);
             if (empty($files))
                 return [];
 

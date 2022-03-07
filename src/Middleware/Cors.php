@@ -53,7 +53,6 @@ class Cors
                 }
                 return $response;
             } catch (Throwable $e) {
-                var_dump($e->getMessage());
                 throw $e;
             }
         });

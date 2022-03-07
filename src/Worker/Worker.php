@@ -25,6 +25,7 @@ use Sohris\Http\Middleware\Error;
 use Sohris\Http\Middleware\Cors;
 use Sohris\Http\Middleware\Logger as MiddlewareLogger;
 use Sohris\Http\Middleware\Router as MiddlewareRouter;
+use Throwable;
 
 class Worker
 {
@@ -46,9 +47,9 @@ class Worker
     private $event;
 
 
-    public function __construct(string $port)
+    public function __construct(string $uri)
     {
-        $this->uri = "127.0.0.1:$port";
+        $this->uri = $uri;
 
         $this->install();
 
@@ -62,56 +63,30 @@ class Worker
 
         $bootstrap = Server::getRootDir() . DIRECTORY_SEPARATOR . "bootstrap.php";
 
-        $this->channel_name = "Channel_". $this->uri;
-
-        $this->channel = Channel::make($this->channel_name, Channel::Infinite);
-
-        $this->events = new Events;
-        $this->events->addChannel($this->channel);
-        $this->events->setBlocking(false);
-
         $this->runtime = new Runtime($bootstrap);
     }
 
     public function start()
     {
         $uri = $this->uri;
-        $this->runtime->run(function ($channel) use ($uri) {
+        $this->runtime->run(function () use ($uri) {
             $log = new Logger("Http");
             try {
                 $log->debug("Starting Worker in $uri", [$uri]);
-                $loop = Loop::get();
                 RouterKernel::loadRoutes();
+
                 $server = new \React\Http\HttpServer(...self::configuredMiddlewares($uri));
                 $socket = new \React\Socket\SocketServer($uri);
+                $socket->on('error', function (Exception $e) use ($log, $uri){
+                    echo $e->getMessage().PHP_EOL;
+                    $log->critical("Error Worker [$uri]", [$e->getMessage()]);
+                });
                 $server->listen($socket);
-                $channel->send(["STATUS" => "LISTEN"]);
-                $loop->run();
-            } catch (Exception $e) {
+                Loop::run();
+            } catch (Throwable $e) {
                 $log->critical("Error Worker [$uri]", [$e->getMessage()]);
             }
-        }, [$this->channel]);
-    }
-
-    private function checkEvent()
-    {
-
-        $event = $this->events->poll();
-        if ($event && $event->source == $this->channel_name) {
-            $this->events->addChannel($this->channel);
-            switch ($event->value['STATUS']) {
-                case "LISTEN":
-                    Loop::cancelTimer($this->timer);
-                    $this->configureStream();
-                    break;
-            }
-        }
-    }
-
-    private function configureStream()
-    {
-        $this->stream = new DuplexResourceStream($this->uri);
-        $this->stream->on('data', fn($data) => $this->event->emit("data", $data));
+        });
     }
 
     private static function configuredMiddlewares(string $uri)
@@ -140,15 +115,5 @@ class Worker
         usort($middlewares, fn ($a, $b) => $a::$priority < $b::$priority);
 
         return $middlewares;
-    }
-
-    public function on(string $event, callable $callable)
-    {
-        $this->event->on($event, $callable);
-    }
-
-    public function write(string $data)
-    {
-        $this->stream->write($data);
     }
 }

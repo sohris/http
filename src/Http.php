@@ -20,6 +20,7 @@ use Sohris\Http\Middleware\Cors;
 use Sohris\Http\Middleware\Logger as MiddlewareLogger;
 use Sohris\Http\Middleware\Router as MiddlewareRouter;
 use Sohris\Http\Worker\Controller;
+use Sohris\Http\Worker\Worker;
 
 class Http extends AbstractComponent
 {
@@ -33,6 +34,8 @@ class Http extends AbstractComponent
 
     private $logger;
 
+    private $loop;
+
     private $workers = 1;
 
     private $configs = array();
@@ -43,7 +46,7 @@ class Http extends AbstractComponent
     {
         $this->configs = Utils::getConfigFiles('http');
         $this->host = $this->configs['host'] . ":" . $this->configs["port"];
-        $this->workers = $this->configs['workers'] < 1 ? 1 :$this->configs['workers']; 
+        $this->workers = $this->configs['workers'] < 1 ? 1 : $this->configs['workers'];
         $this->loop = Loop::get();
         $this->logger = new Logger('Http');
     }
@@ -54,6 +57,7 @@ class Http extends AbstractComponent
         $this->logger->debug("Loaded Middlewares [" . sizeof($this->middlewares) . "]", $this->middlewares);
         RouterKernel::loadRoutes();
         $this->logger->debug("Loaded Routes [" . RouterKernel::getQuantityOfRoutes() . "]");
+        $this->loop->addPeriodicTimer(60, function () {});
     }
 
 
@@ -67,19 +71,13 @@ class Http extends AbstractComponent
     {
 
         if ($this->workers == 1) {
-            $uri = $this->host;
-            $server = new \React\Http\HttpServer(...$this->configuredMiddlewares($uri));
-            $socket = new \React\Socket\SocketServer($uri);
-            $server->listen($socket);
+            $this->workers_queue[] = new Worker($this->host);
             return;
         }
 
-        for ((int) $i = 1; $i <= $this->workers; $i++) 
-        {
+        for ((int) $i = 1; $i <= $this->workers; $i++) {
             $uri = $this->configs['host'] . ":" . (80 + $i);
-            $server = new \React\Http\HttpServer(...$this->configuredMiddlewares($uri));
-            $socket = new \React\Socket\SocketServer($uri);
-            $server->listen($socket);
+            $this->workers_queue[] = new Worker($uri);
         }
     }
 
@@ -106,5 +104,4 @@ class Http extends AbstractComponent
         $array[] = new MiddlewareRouter;
         return $array;
     }
-
 }
