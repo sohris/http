@@ -8,6 +8,7 @@ use Exception;
 use Psr\Http\Message\ResponseInterface;
 use React\Promise\Promise;
 use Sohris\Core\Logger as CLogger;
+use Sohris\Core\Utils;
 use Sohris\Http\IMiddleware;
 
 use function React\Promise\resolve;
@@ -15,10 +16,13 @@ use function React\Promise\resolve;
 class Logger
 {
     private $logger;
+    private $worker = '';
 
-    public function __construct()
+    public function __construct(string $uri)
     {
+        $this->worker = $uri;
         $this->logger = new CLogger('Http');
+        $this->debug = Utils::getConfigFiles('system')['debug'];
     }
 
     public function __invoke(ServerRequestInterface $request, Closure $next)
@@ -30,8 +34,9 @@ class Logger
 
             $end = self::microtime_float();
             $message = "[Status " . $response->getStatusCode() . "]  " . $request->getMethod() . " " .  $request->getRequestTarget() . "  " . round(($end - $start), 3) . "sec ";
-            $this->logger->debug($message);
-            echo $message . PHP_EOL;
+            $this->logger->debug($message, [$this->worker]);
+            if($this->debug)
+                echo $message . PHP_EOL;
     
             return $response;
         }, function (Exception $e) {

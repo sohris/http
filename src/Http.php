@@ -7,6 +7,9 @@ use React\EventLoop\Loop;
 use Sohris\Core\Component\AbstractComponent;
 use React\Http\Middleware\LimitConcurrentRequestsMiddleware;
 use React\Http\Middleware\RequestBodyParserMiddleware;
+use React\Socket\ConnectionInterface;
+use React\Socket\SocketServer;
+use React\Stream\DuplexResourceStream;
 use Sohris\Core\Loader;
 use Sohris\Core\Logger;
 use Sohris\Core\Utils;
@@ -16,6 +19,7 @@ use Sohris\Http\Middleware\Error;
 use Sohris\Http\Middleware\Cors;
 use Sohris\Http\Middleware\Logger as MiddlewareLogger;
 use Sohris\Http\Middleware\Router as MiddlewareRouter;
+use Sohris\Http\Worker\Controller;
 
 class Http extends AbstractComponent
 {
@@ -27,14 +31,17 @@ class Http extends AbstractComponent
 
     private $logger;
 
-    private $routes_loaded;
+    private $workers = 1;
 
     private $configs = array();
+
+    private $worker_control;
 
     public function __construct()
     {
         $this->configs = Utils::getConfigFiles('http');
         $this->host = $this->configs['host'] . ":" . $this->configs["port"];
+        $this->workers = $this->configs['workers'] > 1 ? 1 :$this->configs['workers']; 
         $this->loop = Loop::get();
         $this->logger = new Logger('Http');
     }
@@ -43,7 +50,6 @@ class Http extends AbstractComponent
     {
         $this->loadMiddlewares();
         $this->logger->debug("Loaded Middlewares [" . sizeof($this->middlewares) . "]", $this->middlewares);
-
         RouterKernel::loadRoutes();
         $this->logger->debug("Loaded Routes [" . RouterKernel::getQuantityOfRoutes() . "]");
     }
@@ -57,9 +63,7 @@ class Http extends AbstractComponent
 
     public function start()
     {
-        $this->server = new \React\Http\HttpServer(...$this->configuredMiddlewares());
-        $this->socket = new \React\Socket\SocketServer($this->host);
-        $this->server->listen($this->socket);
+        $this->controller = new Controller($this->configs['workers']);
     }
 
     public function getName(): string
@@ -67,20 +71,4 @@ class Http extends AbstractComponent
         return $this->module_name;
     }
 
-    private function configuredMiddlewares()
-    {
-
-        $array = [
-            new MiddlewareLogger,
-            new Error,
-            new Cors($this->configs['cors_config']),
-            new LimitConcurrentRequestsMiddleware($this->configs['max_concurrent_requests']),
-            new RequestBodyParserMiddleware($this->configs['upload_files_size'], $this->configs['max_upload_files']),
-        ];
-        foreach ($this->middlewares as $middleware) {
-            array_push($array, new $middleware());
-        }
-        $array[] = new MiddlewareRouter;
-        return $array;
-    }
 }
