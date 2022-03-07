@@ -18,16 +18,19 @@ class Controller
     public function __construct(string $worker_pool_size)
     {
         $this->genetatePool($worker_pool_size);
-        
     }
 
     public function genetatePool(int $worker_pool_size = 1)
     {
-        for((int) $i = 0 ; $i < $worker_pool_size; $i++)
-        {
+        if ($worker_pool_size == 1) {
+            $worker = self::workerFactory(80);
+            self::$workers_queue[] = $worker;
+            return;
+        }
+
+        for ((int) $i = 1; $i <= $worker_pool_size; $i++) {
             $port = Utils::getEnablePort();
             $worker = self::workerFactory(80 + $i);
-            //$worker->on('data', fn($data) => $this->writeInStream($data));
             self::$workers_queue[] = $worker;
         }
     }
@@ -41,7 +44,7 @@ class Controller
     {
         return new Worker($port);
     }
-    
+
     public function writeInPool(string $data)
     {
         $worker = self::getNextWorker();
@@ -51,8 +54,7 @@ class Controller
     private static function getNextWorker()
     {
         $worker = \current(self::$workers_queue);
-        if(!$worker)
-        {
+        if (!$worker) {
             \reset(self::$workers_queue);
             $worker = \current(self::$workers_queue);
         }
@@ -60,5 +62,4 @@ class Controller
         \next(self::$workers_queue);
         return $worker;
     }
-
 }
