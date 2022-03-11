@@ -1,7 +1,7 @@
 {
     "name": "sohris/http",
     "type": "library",
-    "version": "0.1.7",
+    "version": "0.1.8",
     "license": "MIT",
     "authors": [
         {
@@ -27,7 +27,8 @@
         "psr/http-server-middleware": "^1.0",
         "mnavarrocarter/path-to-regexp-php": "^1.0",
         "firebase/php-jwt": "^6.0",
-        "react/stream": "^1.2"
+        "react/stream": "^1.2",
+        "guzzlehttp/guzzle": "^7.4"
     },
     
     "autoload": {

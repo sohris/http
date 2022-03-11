@@ -5,7 +5,7 @@
 namespace Sohris\Http\Annotations;
 
 use Psr\Http\Message\ServerRequestInterface;
-use React\Http\Io\UploadedFile;
+use GuzzleHttp\Psr7\UploadedFile;
 use Sohris\Http\Exceptions\StatusHTTPException;
 
 /**
