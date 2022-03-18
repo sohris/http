@@ -77,8 +77,8 @@ class Worker
 
                 $server = new \React\Http\HttpServer(...self::configuredMiddlewares($uri));
                 $socket = new \React\Socket\SocketServer($uri);
-                $socket->on('error', function (Exception $e) use ($log, $uri){
-                    echo $e->getMessage().PHP_EOL;
+                $socket->on('error', function (Exception $e) use ($log, $uri) {
+                    echo $e->getMessage() . PHP_EOL;
                     $log->critical("Error Worker [$uri]", [$e->getMessage()]);
                 });
                 $server->listen($socket);
@@ -95,11 +95,14 @@ class Worker
         $configs =  Utils::getConfigFiles('http');
 
         $array = [
+            new \React\Http\Middleware\StreamingRequestMiddleware(),
+            new \React\Http\Middleware\LimitConcurrentRequestsMiddleware($configs['max_concurrent_requests']), // 100 concurrent buffering handlers
+            new \React\Http\Middleware\RequestBodyBufferMiddleware(2 * 1024 * 1024), // 2 MiB per request
+            new \React\Http\Middleware\RequestBodyParserMiddleware(),
+            new RequestBodyParserMiddleware($configs['upload_files_size'], $configs['max_upload_files']),
             new MiddlewareLogger($uri),
             new Error,
             new Cors($configs['cors_config']),
-            new LimitConcurrentRequestsMiddleware($configs['max_concurrent_requests']),
-            new RequestBodyParserMiddleware($configs['upload_files_size'], $configs['max_upload_files']),
         ];
 
         foreach ($middlewares as $middleware) {
