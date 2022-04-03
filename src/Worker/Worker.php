@@ -38,13 +38,7 @@ class Worker
 
     private $channel;
 
-    private $connection;
-
     private $limit;
-
-    private $socket;
-
-    private $future;
 
     private $memory = 0;
 
@@ -54,7 +48,9 @@ class Worker
 
     private $enable_nginx_controller = false;
 
-    private $event;
+    private $timer_restart;
+
+    private static $connections = 0;
 
 
     public function __construct(string $uri)
@@ -109,9 +105,9 @@ class Worker
 
                 $server = new \React\Http\HttpServer(...self::configuredMiddlewares($uri));
                 $socket = new \React\Socket\SocketServer($uri);
-                $socket->on('error', function (Exception $e) use ($log, $uri) {
-                    echo $e->getMessage() . PHP_EOL;
-                    $log->critical("Error Worker [$uri]", [$e->getMessage()]);
+                $socket->on('connection', function ($connection) {
+                    ++self::$connections;
+                    $connection->on('close', fn () => --self::$connections);
                 });
                 $server->listen($socket);
 
@@ -134,18 +130,23 @@ class Worker
             $file = $this->enable_nginx_controller;
             $uri = $this->uri;
             exec("sed -i 's/$uri/$uri down/g' $file && nginx -s reload");
-            $this->loop->addTimer(5, fn () => $this->restart());
+            $this->logger->debug("Try Restart", [$this->uri]);
+            $this->timer_restart = $this->loop->addPeriodicTimer(1, fn () => $this->restart());
         }
     }
 
     private function restart()
     {
-
-        $this->memory = 0;
-        $this->runtime->kill();
-        $this->loop->cancelTimer($this->timer);
-        $this->install();
-        $this->start();
+        if (self::$connections <= 0) {
+            $this->logger->debug("Restarting ", [$this->uri]);
+            self::$connections = 0;
+            $this->memory = 0;
+            $this->runtime->kill();
+            $this->loop->cancelTimer($this->timer);
+            $this->loop->cancelTimer($this->timer_restart);
+            $this->install();
+            $this->start();
+        }
 
         if ($this->enable_nginx_controller) {
             $file = $this->enable_nginx_controller;
