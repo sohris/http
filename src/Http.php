@@ -49,6 +49,7 @@ class Http extends AbstractComponent
         $this->workers = $this->configs['workers'] < 1 ? 1 : $this->configs['workers'];
         $this->loop = Loop::get();
         $this->logger = new Logger('Http');
+
     }
 
     public function install()

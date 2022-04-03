@@ -40,9 +40,19 @@ class Worker
 
     private $connection;
 
+    private $limit;
+
     private $socket;
 
+    private $future;
+
+    private $memory = 0;
+
+    private $max_memory_limit = 70;
+
     private $channel_name = "";
+
+    private $enable_nginx_controller = false;
 
     private $event;
 
@@ -50,12 +60,34 @@ class Worker
     public function __construct(string $uri)
     {
         $this->uri = $uri;
+        $this->config = Utils::getConfigFiles('http');
+        $this->enable_nginx_controller = $this->config['nginx_config_file'];
+        $this->loop = Loop::get();
+        $this->limit = $this->toInteger(ini_get("memory_limit"));
+
+        $this->channel_name = "worker_control_" . substr($this->uri, -2);
+
+        $this->channel = Channel::make($this->channel_name, Channel::Infinite);
+
+        $this->events = new Events;
+        $this->events->addChannel($this->channel);
+        $this->events->setBlocking(false);
 
         $this->install();
 
         $this->start();
 
+        $this->loop->addPeriodicTimer(1, fn () => $this->checkEvent());
         $this->event = new EventEmitter;
+    }
+
+    public function toInteger($string)
+    {
+        sscanf($string, '%u%c', $number, $suffix);
+        if (isset($suffix)) {
+            $number = $number * pow(1024, strpos(' KMG', strtoupper($suffix)));
+        }
+        return $number;
     }
 
     public function install()
@@ -69,7 +101,7 @@ class Worker
     public function start()
     {
         $uri = $this->uri;
-        $this->runtime->run(function () use ($uri) {
+        $this->runtime->run(function ($channel) use ($uri) {
             $log = new Logger("Http");
             try {
                 $log->debug("Starting Worker in $uri", [$uri]);
@@ -82,11 +114,58 @@ class Worker
                     $log->critical("Error Worker [$uri]", [$e->getMessage()]);
                 });
                 $server->listen($socket);
+
+                Loop::addPeriodicTimer(1, fn () => $channel->send(["STATUS" => "MEMORY", "USAGE" => memory_get_peak_usage()]));
+
                 Loop::run();
             } catch (Throwable $e) {
                 $log->critical("Error Worker [$uri]", [$e->getMessage()]);
             }
-        });
+        }, [$this->channel]);
+
+        if ($this->enable_nginx_controller)
+            $this->timer = $this->loop->addPeriodicTimer(15, fn () => $this->checkWorker());
+    }
+
+    public function checkWorker()
+    {
+        $perc = $this->memory * 100 / $this->limit;
+        if ($perc >= $this->max_memory_limit) {
+            $file = $this->enable_nginx_controller;
+            $uri = $this->uri;
+            exec("sed -i 's/$uri/$uri down/g' $file && nginx -s reload");
+            $this->loop->addTimer(5, fn () => $this->restart());
+        }
+    }
+
+    private function restart()
+    {
+
+        $this->memory = 0;
+        $this->runtime->kill();
+        $this->loop->cancelTimer($this->timer);
+        $this->install();
+        $this->start();
+
+        if ($this->enable_nginx_controller) {
+            $file = $this->enable_nginx_controller;
+            $uri = $this->uri;
+            exec("sed -i 's/$uri down/$uri/g' $file && nginx -s reload");
+        }
+    }
+
+    private function checkEvent()
+    {
+        $event = $this->events->poll();
+
+        if ($event && $event->source == $this->channel_name) {
+            $this->events->addChannel($this->channel);
+            switch ($event->value['STATUS']) {
+                case "MEMORY":
+                    $this->memory = $event->value["USAGE"];
+                    break;
+            }
+        }
     }
 
     private static function configuredMiddlewares(string $uri)
@@ -96,8 +175,8 @@ class Worker
 
         $array = [
             new \React\Http\Middleware\StreamingRequestMiddleware(),
-            new \React\Http\Middleware\LimitConcurrentRequestsMiddleware($configs['max_concurrent_requests']), // 100 concurrent buffering handlers
-            new \React\Http\Middleware\RequestBodyBufferMiddleware(2 * 1024 * 1024), // 2 MiB per request
+            new \React\Http\Middleware\LimitConcurrentRequestsMiddleware($configs['max_concurrent_requests']),
+            new \React\Http\Middleware\RequestBodyBufferMiddleware(2 * 1024 * 1024),
             new \React\Http\Middleware\RequestBodyParserMiddleware(),
             new RequestBodyParserMiddleware($configs['upload_files_size'], $configs['max_upload_files']),
             new MiddlewareLogger($uri),

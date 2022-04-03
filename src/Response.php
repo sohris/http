@@ -19,7 +19,7 @@ class Response
     {
         return new MessageResponse($status, array(
             "Content-Type" => "text/html; charset=utf-8"
-        ), Utils::utf8_encode_rec($body));
+        ), $body);
     }
     public static function fileStream(string $file_name, Stream $stream, $status = 200)
     {
