@@ -50,7 +50,9 @@ class Worker
 
     private $timer_restart;
 
-    private static $connections = 0;
+    private $connections = 0;
+
+    private $logger;
 
 
     public function __construct(string $uri)
@@ -60,14 +62,9 @@ class Worker
         $this->enable_nginx_controller = $this->config['nginx_config_file'];
         $this->loop = Loop::get();
         $this->limit = $this->toInteger(ini_get("memory_limit"));
+        $this->logger = new Logger('Http');
 
-        $this->channel_name = "worker_control_" . substr($this->uri, -2);
-
-        $this->channel = Channel::make($this->channel_name, Channel::Infinite);
-
-        $this->events = new Events;
-        $this->events->addChannel($this->channel);
-        $this->events->setBlocking(false);
+        $this->createChannel();
 
         $this->install();
 
@@ -75,6 +72,17 @@ class Worker
 
         $this->loop->addPeriodicTimer(1, fn () => $this->checkEvent());
         $this->event = new EventEmitter;
+    }
+
+    private function createChannel()
+    {
+        $this->channel_name = "worker_control_" . substr($this->uri, -2);
+
+        $this->channel = Channel::make($this->channel_name, Channel::Infinite);
+
+        $this->events = new Events;
+        $this->events->addChannel($this->channel);
+        $this->events->setBlocking(false);
     }
 
     public function toInteger($string)
@@ -89,6 +97,7 @@ class Worker
     public function install()
     {
 
+        $this->createChannel();
         $bootstrap = Server::getRootDir() . DIRECTORY_SEPARATOR . "bootstrap.php";
 
         $this->runtime = new Runtime($bootstrap);
@@ -105,9 +114,9 @@ class Worker
 
                 $server = new \React\Http\HttpServer(...self::configuredMiddlewares($uri));
                 $socket = new \React\Socket\SocketServer($uri);
-                $socket->on('connection', function ($connection) {
-                    ++self::$connections;
-                    $connection->on('close', fn () => --self::$connections);
+                $socket->on('connection', function ($connection) use ($channel) {
+                    $channel->send(["STATUS" => "ADD_REQUEST"]);
+                    $connection->on('close', fn () => $channel->send(["STATUS" => "SUB_REQUEST"]));
                 });
                 $server->listen($socket);
 
@@ -137,9 +146,9 @@ class Worker
 
     private function restart()
     {
-        if (self::$connections <= 0) {
+        if ($this->connections <= 0) {
             $this->logger->debug("Restarting ", [$this->uri]);
-            self::$connections = 0;
+            $this->connections = 0;
             $this->memory = 0;
             $this->runtime->kill();
             $this->loop->cancelTimer($this->timer);
@@ -164,6 +173,12 @@ class Worker
             switch ($event->value['STATUS']) {
                 case "MEMORY":
                     $this->memory = $event->value["USAGE"];
+                    break;
+                case "ADD_REQUEST":
+                    ++$this->connections;
+                    break;
+                case "SUB_REQUEST":
+                    --$this->connections;
                     break;
             }
         }
