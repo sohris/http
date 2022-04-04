@@ -99,7 +99,7 @@ class Worker
 
         $this->createChannel();
 
-        if($this->enable_nginx_controller){
+        if ($this->enable_nginx_controller) {
             $uri = $this->uri;
             $file = $this->enable_nginx_controller;
             exec("sed -i 's/$uri down/$uri/g' $file && nginx -s reload");
@@ -146,22 +146,35 @@ class Worker
             $uri = $this->uri;
             exec("sed -i 's/$uri/$uri down/g' $file && nginx -s reload");
             $this->logger->debug("Try Restart", [$this->uri]);
-            $this->timer_restart = $this->loop->addPeriodicTimer(1, fn () => $this->restart());
+            $this->timer_restart = $this->loop->addPeriodicTimer(1, fn () => $this->checkRestart());
+        }else {
+            $check = shell_exec("curl --connect-timeout 60 " . $this->uri . "/precheck");
+            if(!$check || $check != 'OK')
+            {
+                $this->restart();
+            }
+        }
+    }
+
+    private function checkRestart()
+    {
+
+        if ($this->connections <= 0) {
+            $this->loop->cancelTimer($this->timer_restart);
+            $this->restart();
         }
     }
 
     private function restart()
     {
-        if ($this->connections <= 0) {
-            $this->logger->debug("Restarting ", [$this->uri]);
-            $this->connections = 0;
-            $this->memory = 0;
-            $this->runtime->kill();
-            $this->loop->cancelTimer($this->timer);
-            $this->loop->cancelTimer($this->timer_restart);
-            $this->install();
-            $this->start();
-        }
+        $this->logger->debug("Restarting ", [$this->uri]);
+        $this->connections = 0;
+        $this->memory = 0;
+        $this->runtime->kill();
+        $this->loop->cancelTimer($this->timer);
+        $this->install();
+        $this->start();
+
 
         if ($this->enable_nginx_controller) {
             $file = $this->enable_nginx_controller;
@@ -169,6 +182,8 @@ class Worker
             exec("sed -i 's/$uri down/$uri/g' $file && nginx -s reload");
         }
     }
+
+
 
     private function checkEvent()
     {
