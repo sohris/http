@@ -64,8 +64,6 @@ class Worker
         $this->limit = $this->toInteger(ini_get("memory_limit"));
         $this->logger = new Logger('Http');
 
-        $this->createChannel();
-
         $this->install();
 
         $this->start();
@@ -76,6 +74,9 @@ class Worker
 
     private function createChannel()
     {
+        if($this->channel)
+            $this->channel->close();
+            
         $this->channel_name = "worker_control_" . substr($this->uri, -2);
 
         $this->channel = Channel::make($this->channel_name, Channel::Infinite);
@@ -129,6 +130,7 @@ class Worker
                 Loop::addPeriodicTimer(1, fn () => $channel->send(["STATUS" => "MEMORY", "USAGE" => memory_get_peak_usage()]));
 
                 Loop::run();
+                echo 312 . PHP_EOL;
             } catch (Throwable $e) {
                 $log->critical("Error Worker [$uri]", [$e->getMessage()]);
             }
