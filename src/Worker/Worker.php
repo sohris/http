@@ -130,7 +130,6 @@ class Worker
                 Loop::addPeriodicTimer(1, fn () => $channel->send(["STATUS" => "MEMORY", "USAGE" => memory_get_peak_usage()]));
 
                 Loop::run();
-                echo 312 . PHP_EOL;
             } catch (Throwable $e) {
                 $log->critical("Error Worker [$uri]", [$e->getMessage()]);
             }
@@ -150,9 +149,10 @@ class Worker
             $this->logger->debug("Try Restart", [$this->uri]);
             $this->timer_restart = $this->loop->addPeriodicTimer(1, fn () => $this->checkRestart());
         }else {
-            $check = shell_exec("curl --connect-timeout 60 " . $this->uri . "/precheck");
+            $check = shell_exec("curl -m 30 --connect-timeout 10 " . $this->uri . "/precheck");
             if(!$check || $check != 'OK')
             {
+                $this->logger->debug($check, [$this->uri]);
                 $this->restart();
             }
         }
