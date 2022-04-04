@@ -98,6 +98,12 @@ class Worker
     {
 
         $this->createChannel();
+
+        if($this->enable_nginx_controller){
+            $uri = $this->uri;
+            $file = $this->enable_nginx_controller;
+            exec("sed -i 's/$uri down/$uri/g' $file && nginx -s reload");
+        }
         $bootstrap = Server::getRootDir() . DIRECTORY_SEPARATOR . "bootstrap.php";
 
         $this->runtime = new Runtime($bootstrap);
