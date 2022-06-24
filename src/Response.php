@@ -9,7 +9,7 @@ use Sohris\Http\Utils;
 class Response
 {
 
-    public static function Json(string $message, $status = 200)
+    public static function Json($message, $status = 200)
     {
         return new MessageResponse($status, array(
             "Content-Type" => "application/json"
