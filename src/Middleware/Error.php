@@ -38,7 +38,7 @@ class Error
                 json_encode(array("error" => $e->getCode(), "info" => $e->getMessage()))
             );
         } catch (Throwable $e) {
-            $this->logger->critical($e->getMessage(), $e->getTrace());
+            $this->logger->critical($e->getMessage(), \array_slice($e->getTrace(), 0,3));
             return new Response(
                 "500",
                 array(
