@@ -59,6 +59,7 @@ class Worker
     {
         $this->uri = $uri;
         $this->config = Utils::getConfigFiles('http');
+        Utils::bytesToHuman()
         $this->enable_nginx_controller = $this->config['nginx_config_file'];
         $this->loop = Loop::get();
         $this->limit = $this->toInteger(ini_get("memory_limit"));
@@ -115,6 +116,14 @@ class Worker
         $uri = $this->uri;
         $this->runtime->run(function ($channel) use ($uri) {
             $log = new Logger("Http");
+            set_error_handler(function () use ($channel) {
+
+                $log = new Logger("Http");
+                $log->critical("ERROR");
+            });
+            register_shutdown_function(function () {
+                var_dump(error_get_last());
+            });
             try {
                 $log->debug("Starting Worker in $uri", [$uri]);
                 RouterKernel::loadRoutes();
@@ -141,14 +150,16 @@ class Worker
 
     public function checkWorker()
     {
+        Utils::bytesToHuman()
         $perc = $this->memory * 100 / $this->limit;
+        $this->logger->debug("Perc $perc - " . $this->uri);
         if ($perc >= $this->max_memory_limit) {
             $file = $this->enable_nginx_controller;
             $uri = $this->uri;
             exec("sed -i 's/$uri/$uri down/g' $file && nginx -s reload");
             $this->logger->debug("Try Restart", [$this->uri]);
             $this->timer_restart = $this->loop->addPeriodicTimer(1, fn () => $this->checkRestart());
-        }else {
+        }else if($this->config['use_precheck']) {
             $check = shell_exec("curl -m 30 --connect-timeout 10 " . $this->uri . "/precheck");
             if(!$check || $check != 'OK')
             {
