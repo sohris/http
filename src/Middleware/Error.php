@@ -27,7 +27,7 @@ class Error
         $promise = resolve($next($request));
 
         return $promise->then(null, function (\Exception $e) {
-            if (strpos(50, $e->getCode()))
+            if (strpos(50, chr($e->getCode())))
                 $this->logger->critical($e->getMessage(), array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
             else
                 $this->logger->warning($e->getMessage(), array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
