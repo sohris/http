@@ -59,7 +59,6 @@ class Worker
     {
         $this->uri = $uri;
         $this->config = Utils::getConfigFiles('http');
-        Utils::bytesToHuman()
         $this->enable_nginx_controller = $this->config['nginx_config_file'];
         $this->loop = Loop::get();
         $this->limit = $this->toInteger(ini_get("memory_limit"));
@@ -150,7 +149,6 @@ class Worker
 
     public function checkWorker()
     {
-        Utils::bytesToHuman()
         $perc = $this->memory * 100 / $this->limit;
         $this->logger->debug("Perc $perc - " . $this->uri);
         if ($perc >= $this->max_memory_limit) {
