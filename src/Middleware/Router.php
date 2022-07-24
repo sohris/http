@@ -25,7 +25,6 @@ class Router
         Kernel::validNeeded($request);
 
         $request->SESSION = Kernel::getSessionJWT($request->route_hash, $request);
-        $promise = resolve(Kernel::callRoute($request));
-        return $promise;
+        return Kernel::callRoute($request);
     }   
 }

@@ -24,20 +24,38 @@ class Error
 
     public function __invoke(ServerRequestInterface $request, Closure $next = null)
     {
-        $promise = resolve($next($request));
-
-        return $promise->then(null, function (\Exception $e) {
-            if (strpos(50, chr($e->getCode())))
+       
+        try {
+            return $next($request)->then(null, function (\Exception $e) {
+                if (strpos(50, chr($e->getCode())))
+                    $this->logger->critical($e->getMessage(), array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
+                else
+                    $this->logger->warning($e->getMessage(), array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
+                return new Response(
+                    $e->getCode(),
+                    array(
+                        'Content-Type' => 'application/json'
+                    ),
+                    json_encode(array("error" => $e->getCode(), "info" => $e->getMessage()))
+                );
+            });
+        } catch (Throwable $e) {
+            $code = $e->getCode();
+            if($e->getCode() == 0)
+            {
+                $code = 500;
+            }
+            if (strpos(50, chr($code)))
                 $this->logger->critical($e->getMessage(), array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
             else
                 $this->logger->warning($e->getMessage(), array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
             return new Response(
-                $e->getCode(),
+                $code,
                 array(
                     'Content-Type' => 'application/json'
                 ),
-                json_encode(array("error" => $e->getCode(), "info" => $e->getMessage()))
+                json_encode(array("error" => $code, "info" => $e->getMessage()))
             );
-        });
+        }
     }
 }
