@@ -30,7 +30,7 @@ class Logger
 
         $start = self::microtime_float();
 
-        $response = resolve($next($request))->then(function (ResponseInterface $response) use ($request, $start) {
+        return resolve($next($request))->then(function (ResponseInterface $response) use ($request, $start) {
 
             $end = self::microtime_float();
             $message = "[Status " . $response->getStatusCode() . "]  " . $request->getMethod() . " " .  $request->getRequestTarget() . "  " . round(($end - $start), 3) . "sec ";
@@ -39,10 +39,7 @@ class Logger
                 echo $message . PHP_EOL;
     
             return $response;
-        }, function (Exception $e) {
-
         });
-        return $response;
     }
 
     public static function microtime_float()

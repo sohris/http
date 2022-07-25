@@ -26,7 +26,7 @@ class Error
     {
        
         try {
-            return $next($request)->then(null, function (\Exception $e) {
+            return resolve($next($request))->then(null, function (\Exception $e) {
                 if (strpos(50, chr($e->getCode())))
                     $this->logger->critical($e->getMessage(), array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
                 else
