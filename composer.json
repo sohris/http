@@ -1,23 +1,13 @@
 {
     "name": "sohris/http",
     "type": "library",
-    "version": "0.1.25",
+    "version": "0.2.1",
     "license": "MIT",
     "authors": [
         {
             "name": "Rdanieli",
             "email": "rodri.merlucci@gmail.com"
         }
-    ],
-    "repositories": [
-      {
-        "type": "vcs",
-        "url": "git@github.com:sohris/core.git"
-      },
-      {
-        "type": "vcs",
-        "url": "git@github.com:sohris/thread.git"
-      }
     ],
     "require": {
         "sohris/core" : "^0.2",
@@ -30,10 +20,10 @@
         "react/stream": "^1.2",
         "guzzlehttp/guzzle": "^7.4"
     },
-    
     "autoload": {
         "psr-4": {
-          "Sohris\\Http\\": "src/"
+          "Sohris\\Http\\": "src/",
+          "Routes\\": "routes/"
         }
       }
 }

@@ -2,24 +2,17 @@
 
 namespace Sohris\Http\Worker;
 
-use Evenement\EventEmitter;
+
 use Exception;
-use parallel\Channel;
-use parallel\Events;
-use parallel\Runtime;
-use Psr\Http\Message\ServerRequestInterface;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use React\EventLoop\Loop;
-use Sohris\Core\Component\AbstractComponent;
-use React\Http\Middleware\LimitConcurrentRequestsMiddleware;
 use React\Http\Middleware\RequestBodyParserMiddleware;
-use React\Socket\ConnectionInterface;
-use React\Socket\SocketServer;
-use React\Stream\DuplexResourceStream;
 use Sohris\Core\Loader;
 use Sohris\Core\Logger;
-use Sohris\Core\Server;
+use Sohris\Core\Tools\Worker\ChannelController;
+use Sohris\Core\Tools\Worker\Worker as CoreWorker;
 use Sohris\Core\Utils;
-use Sohris\Http\Handler;
 use Sohris\Http\Router\Kernel as RouterKernel;
 use Sohris\Http\Middleware\Error;
 use Sohris\Http\Middleware\Cors;
@@ -31,62 +24,51 @@ class Worker
 {
 
     private $uri;
-
-    private $events;
-
-    private $runtime;
-
-    private $channel;
-
-    private $limit;
-
-    private $memory = 0;
-
-    private $max_memory_limit = 70;
-
-    private $channel_name = "";
-
-    private $enable_nginx_controller = false;
-
-    private $timer_restart;
-
     private $connections = 0;
-
+    private $timer = 0;
+    private $requests = 0;
+    private $process_requests = 0;
+    private $uptime;
+    private $memory = 0;
     private $logger;
+    private $client;
+
+    /**
+     * @var CoreWorker
+     */
+    private $worker;
+    private static $configs;
 
 
-    public function __construct(string $uri)
+    public function __construct(string $url, $port = 80)
     {
+        $uri = "$url:$port";
+        self::firstRun();
         $this->uri = $uri;
-        $this->config = Utils::getConfigFiles('http');
-        $this->enable_nginx_controller = $this->config['nginx_config_file'];
-        $this->loop = Loop::get();
-        $this->limit = $this->toInteger(ini_get("memory_limit"));
         $this->logger = new Logger('Http');
-
-        $this->install();
-
+        $this->client = new Client([
+            "base_uri" => "http://" . ($url == '0.0.0.0' ? "localhost:$port" : $uri)
+        ]);
+        $this->worker = new CoreWorker;
+        $this->worker->on('memory_usage', fn ($el) => $this->memory = $el);
+        $this->worker->on('add_connection', fn () => $this->connections++);
+        $this->worker->on('remove_connection', fn () => $this->connections--);
+        $this->worker->on('add_request', fn () => $this->requests++);
+        $this->worker->on('add_process_request', fn () => $this->process_requests++);
+        $this->worker->on('add_timer', fn ($el) => $this->timer += $el);
+        $this->worker->on('set_uptime', fn ($el) => $this->uptime = $el);
         $this->start();
-
-        $this->loop->addPeriodicTimer(1, fn () => $this->checkEvent());
-        $this->event = new EventEmitter;
+        Loop::addPeriodicTimer(60, fn () => $this->checkIsUp());
     }
 
-    private function createChannel()
+    private static function firstRun()
     {
-        if($this->channel)
-            $this->channel->close();
-            
-        $this->channel_name = "worker_control_" . substr($this->uri, -2);
-
-        $this->channel = Channel::make($this->channel_name, Channel::Infinite);
-
-        $this->events = new Events;
-        $this->events->addChannel($this->channel);
-        $this->events->setBlocking(false);
+        if (!self::$configs) {
+            self::$configs = Utils::getConfigFiles('http');
+        }
     }
 
-    public function toInteger($string)
+    public static function toInteger($string)
     {
         sscanf($string, '%u%c', $number, $suffix);
         if (isset($suffix)) {
@@ -95,128 +77,64 @@ class Worker
         return $number;
     }
 
-    public function install()
-    {
-
-        $this->createChannel();
-
-        if ($this->enable_nginx_controller) {
-            $uri = $this->uri;
-            $file = $this->enable_nginx_controller;
-            exec("sed -i 's/$uri down/$uri/g' $file && nginx -s reload");
-        }
-        $bootstrap = Server::getRootDir() . DIRECTORY_SEPARATOR . "bootstrap.php";
-
-        $this->runtime = new Runtime($bootstrap);
-    }
-
     public function start()
     {
         $uri = $this->uri;
-        $this->runtime->run(function ($channel) use ($uri) {
-            $log = new Logger("Http");
-            set_error_handler(function () use ($channel) {
-
-                $log = new Logger("Http");
-                $log->critical("ERROR");
-            });
-            register_shutdown_function(function () {
-                var_dump(error_get_last());
-            });
+        $channel_name = $this->worker->getChannelName();
+        $this->worker->callOnFirst(static function () use ($uri, $channel_name) {
             try {
+                ChannelController::send($channel_name, 'set_uptime', time());
+                $log = new Logger('Http');
                 $log->debug("Starting Worker in $uri", [$uri]);
                 RouterKernel::loadRoutes();
-
-                $server = new \React\Http\HttpServer(...self::configuredMiddlewares($uri));
+                $server = new \React\Http\HttpServer(...self::configuredMiddlewares($uri, $channel_name));
                 $socket = new \React\Socket\SocketServer($uri);
-                $socket->on('connection', function ($connection) use ($channel) {
-                    $channel->send(["STATUS" => "ADD_REQUEST"]);
-                    $connection->on('close', fn () => $channel->send(["STATUS" => "SUB_REQUEST"]));
+                $socket->on('connection', function ($connection) use ($channel_name) {
+                    ChannelController::send($channel_name, 'add_connection');
+                    $connection->on('close', fn () => ChannelController::send($channel_name, 'remove_connection'));
                 });
                 $server->listen($socket);
 
-                Loop::addPeriodicTimer(1, fn () => $channel->send(["STATUS" => "MEMORY", "USAGE" => memory_get_peak_usage()]));
-
+                $socket->on('error', function (Exception $e) use ($channel_name) {
+                    ChannelController::send($channel_name, 'socket_error', [
+                        'code' => $e->getCode(),
+                        'message' => $e->getMessage()
+                    ]);
+                });
+                $server->on('error', function (Exception $e) use ($channel_name) {
+                    ChannelController::send($channel_name, 'server_error', [
+                        'code' => $e->getCode(),
+                        'message' => $e->getMessage()
+                    ]);
+                });
+                Loop::addPeriodicTimer(10, fn () =>
+                ChannelController::send($channel_name, 'memory_usage', memory_get_peak_usage()));
                 Loop::run();
-            } catch (Throwable $e) {
+            } catch (Exception $e) {
+                $log = new Logger("Http");
                 $log->critical("Error Worker [$uri]", [$e->getMessage()]);
             }
-        }, [$this->channel]);
-
-        if ($this->enable_nginx_controller)
-            $this->timer = $this->loop->addPeriodicTimer(15, fn () => $this->checkWorker());
+        });
+        $this->worker->run();
     }
 
-    public function checkWorker()
+    private function checkIsUp()
     {
-        $perc = $this->memory * 100 / $this->limit;
-        $this->logger->debug("Perc $perc - " . $this->uri);
-        if ($perc >= $this->max_memory_limit) {
-            $file = $this->enable_nginx_controller;
-            $uri = $this->uri;
-            exec("sed -i 's/$uri/$uri down/g' $file && nginx -s reload");
-            $this->logger->debug("Try Restart", [$this->uri]);
-            $this->timer_restart = $this->loop->addPeriodicTimer(1, fn () => $this->checkRestart());
-        }else if($this->config['use_precheck']) {
-            $check = shell_exec("curl -m 30 --connect-timeout 10 " . $this->uri . "/precheck");
-            if(!$check || $check != 'OK')
-            {
-                $this->logger->debug($check, [$this->uri]);
+        try {
+            $this->client->get("/", ['timeout' => 5]);
+        } catch (GuzzleException $e) {
+            if (empty($e->getCode())) {
                 $this->restart();
             }
         }
     }
 
-    private function checkRestart()
-    {
-
-        if ($this->connections <= 0) {
-            $this->loop->cancelTimer($this->timer_restart);
-            $this->restart();
-        }
-    }
-
     private function restart()
     {
-        $this->logger->debug("Restarting ", [$this->uri]);
-        $this->connections = 0;
-        $this->memory = 0;
-        $this->runtime->kill();
-        $this->loop->cancelTimer($this->timer);
-        $this->install();
-        $this->start();
-
-
-        if ($this->enable_nginx_controller) {
-            $file = $this->enable_nginx_controller;
-            $uri = $this->uri;
-            exec("sed -i 's/$uri down/$uri/g' $file && nginx -s reload");
-        }
+        $this->worker->restart();
     }
 
-
-
-    private function checkEvent()
-    {
-        $event = $this->events->poll();
-
-        if ($event && $event->source == $this->channel_name) {
-            $this->events->addChannel($this->channel);
-            switch ($event->value['STATUS']) {
-                case "MEMORY":
-                    $this->memory = $event->value["USAGE"];
-                    break;
-                case "ADD_REQUEST":
-                    ++$this->connections;
-                    break;
-                case "SUB_REQUEST":
-                    --$this->connections;
-                    break;
-            }
-        }
-    }
-
-    private static function configuredMiddlewares(string $uri)
+    private static function configuredMiddlewares(string $uri, string $channel_key)
     {
         $middlewares = self::loadMiddlewares();
         $configs =  Utils::getConfigFiles('http');
@@ -227,7 +145,7 @@ class Worker
             new \React\Http\Middleware\RequestBodyBufferMiddleware(2 * 1024 * 1024),
             new \React\Http\Middleware\RequestBodyParserMiddleware(),
             new RequestBodyParserMiddleware($configs['upload_files_size'], $configs['max_upload_files']),
-            new MiddlewareLogger($uri),
+            new MiddlewareLogger($uri, $channel_key),
             new Error,
             new Cors($configs['cors_config']),
         ];
@@ -245,5 +163,22 @@ class Worker
         usort($middlewares, fn ($a, $b) => $a::$priority < $b::$priority);
 
         return $middlewares;
+    }
+
+    public function getStats()
+    {
+        $uptime = time() - $this->uptime;
+        return [
+            'url' => $this->uri,
+            'memory_usage' => $this->memory,
+            'uptime' => $uptime,
+            'requests' => $this->requests,
+            'request_per_sec' => round($this->requests/$uptime, 3),
+            'process_requests' => $this->process_requests,
+            'active_requests' => $this->requests - $this->process_requests,
+            'active_connections' => $this->connections,
+            'time_process_requests' => round($this->timer, 3),
+            'avg_time_request' => round($this->timer / $this->requests,3)
+        ];
     }
 }
