@@ -178,7 +178,7 @@ class Worker
             'active_requests' => $this->requests - $this->process_requests,
             'active_connections' => $this->connections,
             'time_process_requests' => round($this->timer, 3),
-            'avg_time_request' => round($this->timer / $this->requests,3)
+            'avg_time_request' =>  $this->requests <= 0 ? 0 : round($this->timer / $this->requests,3)
         ];
     }
 }

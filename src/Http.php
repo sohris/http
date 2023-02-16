@@ -72,7 +72,7 @@ class Http extends ComponentControl
         ];
         foreach ($this->workers_queue as $key => $worker) {
             $stat = $worker->getStats();
-            $stats["workers"][$key] = $stat;
+            $stats["workers"][] = $stat;
             $stats["total_requests"] += $stat['requests'];
             $stats["total_time"] += $stat['time_process_requests'];
             $stats["total_active_connections"] += $stat['active_connections'];
