@@ -185,8 +185,8 @@ class Worker
             'avg_time_request' =>  $this->requests <= 0 ? 0 : round($this->timer / $this->requests,3)
         ];
         
-        if($this->server->getComponent("Sohris\Mysql\Mysql"))
-            $stats['database'] = \Sohris\Mysql\Mysql::getStats();
+        if($mysql = $this->server->getComponent("Sohris\Mysql\Mysql"))
+            $stats['database'] = $mysql->getStats();
 
         return $stats;
     }
