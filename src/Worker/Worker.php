@@ -10,6 +10,7 @@ use React\EventLoop\Loop;
 use React\Http\Middleware\RequestBodyParserMiddleware;
 use Sohris\Core\Loader;
 use Sohris\Core\Logger;
+use Sohris\Core\Server;
 use Sohris\Core\Tools\Worker\ChannelController;
 use Sohris\Core\Tools\Worker\Worker as CoreWorker;
 use Sohris\Core\Utils;
@@ -30,6 +31,7 @@ class Worker
     private $process_requests = 0;
     private $uptime;
     private $memory = 0;
+    private $server;
     private $logger;
     private $client;
 
@@ -44,6 +46,7 @@ class Worker
     {
         $uri = "$url:$port";
         self::firstRun();
+        $this->server = Server::getServer();
         $this->uri = $uri;
         $this->logger = new Logger('Http');
         $this->client = new Client([
@@ -167,8 +170,9 @@ class Worker
 
     public function getStats()
     {
+
         $uptime = time() - $this->uptime;
-        return [
+        $stats = [
             'url' => $this->uri,
             'memory_usage' => $this->memory,
             'uptime' => $uptime,
@@ -180,5 +184,10 @@ class Worker
             'time_process_requests' => round($this->timer, 3),
             'avg_time_request' =>  $this->requests <= 0 ? 0 : round($this->timer / $this->requests,3)
         ];
+        
+        if($this->server->getComponent("Sohris\Mysql\Mysql"))
+            $stats['database'] = \Sohris\Mysql\Mysql::getStats();
+
+        return $stats;
     }
 }
