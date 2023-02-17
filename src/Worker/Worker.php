@@ -147,7 +147,7 @@ class Worker
         }
     }
 
-    private function restart()
+    public function restart()
     {
         $this->worker->restart();
     }
