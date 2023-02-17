@@ -34,6 +34,9 @@ class Worker
     private $server;
     private $logger;
     private $client;
+    private static $mysql;
+    private $database;
+
 
     /**
      * @var CoreWorker
@@ -60,6 +63,7 @@ class Worker
         $this->worker->on('add_process_request', fn () => $this->process_requests++);
         $this->worker->on('add_timer', fn ($el) => $this->timer += $el);
         $this->worker->on('set_uptime', fn ($el) => $this->uptime = $el);
+        self::$mysql = $this->server->getComponent("Sohris\Mysql\Mysql");
         $this->start();
         Loop::addPeriodicTimer(60, fn () => $this->checkIsUp());
     }
@@ -111,13 +115,24 @@ class Worker
                     ]);
                 });
                 Loop::addPeriodicTimer(10, fn () =>
-                ChannelController::send($channel_name, 'memory_usage', memory_get_peak_usage()));
-                Loop::run();
+                ChannelController::send($channel_name, 'memory_usage', memory_get_peak_usage()));                
             } catch (Exception $e) {
                 $log = new Logger("Http");
                 $log->critical("Error Worker [$uri]", [$e->getMessage()]);
             }
         });
+        if (self::$mysql) {
+            $this->worker->callFunction(static function ($emitter) {
+                if (!self::$mysql) {
+                    $server = Server::getServer();
+                    self::$mysql = $server->getComponent("Sohris\Mysql\Mysql");
+                }
+                $emitter('database_update', self::$mysql->getStats());
+            },10);
+            $this->worker->on('database_update', function ($info){
+                $this->database = $info;
+            });
+        }
         $this->worker->run();
     }
 
@@ -177,16 +192,17 @@ class Worker
             'memory_usage' => $this->memory,
             'uptime' => $uptime,
             'requests' => $this->requests,
-            'request_per_sec' => round($this->requests/$uptime, 3),
+            'request_per_sec' => round($this->requests / $uptime, 3),
             'process_requests' => $this->process_requests,
             'active_requests' => $this->requests - $this->process_requests,
             'active_connections' => $this->connections,
             'time_process_requests' => round($this->timer, 3),
-            'avg_time_request' =>  $this->requests <= 0 ? 0 : round($this->timer / $this->requests,3)
+            'avg_time_request' =>  $this->requests <= 0 ? 0 : round($this->timer / $this->requests, 3)
         ];
-        
-        if($mysql = $this->server->getComponent("Sohris\Mysql\Mysql"))
-            $stats['database'] = $mysql->getStats();
+
+        if($this->database)
+            $stats['database'] = $this->database;
+
 
         return $stats;
     }

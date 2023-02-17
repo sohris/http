@@ -80,7 +80,7 @@ class Http extends ComponentControl
             $stats['total_requests_per_sec'] += $stat['request_per_sec'];
         }
         $stats['total_requests_per_sec'] = round($stats['total_requests_per_sec']/count($this->workers_queue), 3);
-        $stats['avg_time_request'] = round($stats['total_time'] / $stats['total_requests'], 3);
+        $stats['avg_time_request'] = $stats['total_requests'] <= 0? 0: round($stats['total_time'] / $stats['total_requests'], 3);
 
         return $stats;
     }
