@@ -89,13 +89,13 @@ class Http extends ComponentControl
     public function getWorker($worker_host):Worker
     {      
         $key = sha1($worker_host);
-        if(!array_key_exists($key, $this->workers)) throw new Exception("INVALID_WORKER");
-        return $this->workers[$key];
+        if(!array_key_exists($key, $this->workers_queue)) throw new Exception("INVALID_WORKER");
+        return $this->workers_queue[$key];
     }
     
     public function hasWorker($worker_host):bool
     {      
         $key = sha1($worker_host);
-        return array_key_exists($key, $this->workers);
+        return array_key_exists($key, $this->workers_queue);
     }
 }
