@@ -56,6 +56,7 @@ class Worker
             "base_uri" => "http://" . ($url == '0.0.0.0' ? "localhost:$port" : $uri)
         ]);
         $this->worker = new CoreWorker;
+        $this->worker->stayAlive();
         $this->worker->on('memory_usage', fn ($el) => $this->memory = $el);
         $this->worker->on('add_connection', fn () => $this->connections++);
         $this->worker->on('remove_connection', fn () => $this->connections--);
