@@ -17,7 +17,6 @@ abstract class DRMRouter
     public function getRoutesMapper()
     {
         $this->loadRoute($this);
-
         return $this->mapper;
     }
 

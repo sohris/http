@@ -18,7 +18,7 @@ class Kernel
     private static $router_map = [];
 
     public static function loadRoutes()
-    {
+    {   
         foreach (Loader::getClassesWithParent("Sohris\Http\Router\RouterControllers\DRMRouter") as $route_class) {
             $class = new $route_class;
             self::$router_map = array_merge($class->getRoutesMapper(), self::$router_map);
@@ -61,6 +61,7 @@ class Kernel
     public static function validNeeded(ServerRequestInterface &$request)
     {
         $class = self::getClassOfRoute($request->route_hash);
+        $request->REQUEST = [];
         if (isset($class->needed))
             $request->REQUEST = $class->needed->getNeededInRequest($request);
         $request->FILES = Needed::getFilesInRequest($request);

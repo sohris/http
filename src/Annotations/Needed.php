@@ -74,7 +74,8 @@ class Needed
     public static function filterNeeded(array $parameters, array $needed)
     {
         $filtered = [];
-
+        if (empty($needed))
+            return $parameters;
         foreach ($needed as $n) {
             if (!array_key_exists($n, $parameters))
                 throw new StatusHTTPException("Invalid Parameters", 401);

@@ -64,7 +64,6 @@ class Worker
         $this->worker->on('add_process_request', fn () => $this->process_requests++);
         $this->worker->on('add_timer', fn ($el) => $this->timer += $el);
         $this->worker->on('set_uptime', fn ($el) => $this->uptime = $el);
-        self::$mysql = $this->server->getComponent("Sohris\Mysql\Mysql");
         $this->start();
         Loop::addPeriodicTimer(60, fn () => $this->checkIsUp());
     }
@@ -116,24 +115,27 @@ class Worker
                     ]);
                 });
                 Loop::addPeriodicTimer(10, fn () =>
-                ChannelController::send($channel_name, 'memory_usage', memory_get_peak_usage()));                
+                ChannelController::send($channel_name, 'memory_usage', memory_get_peak_usage()));
             } catch (Exception $e) {
                 $log = new Logger("Http");
                 $log->critical("Error Worker [$uri]", [$e->getMessage()]);
             }
         });
-        if (self::$mysql) {
+        try {
+            self::$mysql = $this->server->getComponent("Sohris\Mysql\Mysql");
             $this->worker->callFunction(static function ($emitter) {
                 if (!self::$mysql) {
                     $server = Server::getServer();
                     self::$mysql = $server->getComponent("Sohris\Mysql\Mysql");
                 }
                 $emitter('database_update', self::$mysql->getStats());
-            },10);
-            $this->worker->on('database_update', function ($info){
+            }, 10);
+            $this->worker->on('database_update', function ($info) {
                 $this->database = $info;
             });
+        } catch (Exception $e) {
         }
+
         $this->worker->run();
     }
 
@@ -201,7 +203,7 @@ class Worker
             'avg_time_request' =>  $this->requests <= 0 ? 0 : round($this->timer / $this->requests, 3)
         ];
 
-        if($this->database)
+        if ($this->database)
             $stats['database'] = $this->database;
 
 
