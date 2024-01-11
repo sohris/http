@@ -118,7 +118,7 @@ class Worker
                 ChannelController::send($channel_name, 'memory_usage', memory_get_peak_usage()));
             } catch (Exception $e) {
                 $log = new Logger("Http");
-                $log->critical("Error Worker [$uri]", [$e->getMessage()]);
+                $log->critical("Error Worker[$uri][".$e->getMessage(). "] " . $e->getFile() . " - (" . $e->getLine() . ")", []);
             }
         });
         try {
