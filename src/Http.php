@@ -7,6 +7,7 @@ use React\Http\Middleware\RequestBodyParserMiddleware;
 use Sohris\Core\ComponentControl;
 use Sohris\Core\Loader;
 use Sohris\Core\Logger;
+use Sohris\Core\Tools\Worker\Worker;
 use Sohris\Core\Utils;
 use Sohris\Http\Middleware\Cors;
 use Sohris\Http\Middleware\Error;
@@ -18,7 +19,8 @@ class Http extends ComponentControl
 {
     private $module_name = "Sohris_Http";
 
-    private Logger $logger;
+    private static Logger $logger;
+    private Worker $worker;
 
     private $configs = array();
 
@@ -34,13 +36,13 @@ class Http extends ComponentControl
     {
         $this->uptime = time();
         $this->configs = Utils::getConfigFiles('http');
-        $this->logger = new Logger('CoreHttp');
+        self::$logger = new Logger('CoreHttp');
     }
 
     public function install()
     {
         RouterKernel::loadRoutes();
-        $this->logger->info("Routes [" . RouterKernel::getQuantityOfRoutes() . "]");
+        self::$logger->info("Routes [" . RouterKernel::getQuantityOfRoutes() . "]");
     }
 
     public function start()
@@ -54,43 +56,49 @@ class Http extends ComponentControl
         $port = $this->configs['port'];
         $url = $this->configs['host'];
         $uri = ($url == 'localhost' ? "0.0.0.0:$port" : "$url:$port");
+        self::$logger->debug("Creating Server");
+        $this->worker = new Worker;
+        $this->worker->stayAlive();
+        $this->worker->callOnFirst(static function () use ($uri) {
+            self::$logger = new Logger("CoreHttp");
+            RouterKernel::loadRoutes();                
+            $server = new \React\Http\HttpServer(...self::configuredMiddlewares($uri));
+            $socket = new \React\Socket\SocketServer($uri);
+            // $socket->on('connection', function ($connection) {
+            //     self::$logger->debug("New Connection");
+            //     self::$stats['connections']++;
+            //     $connection->on('close', function () {
+            //         self::$stats['connections']--;
+            //     });
+            // });
+            $server->listen($socket);
 
-        $this->logger->debug("Creating Server");
-        $server = new \React\Http\HttpServer(...$this->configuredMiddlewares($uri));
-        $socket = new \React\Socket\SocketServer($uri);
-        $socket->on('connection', function ($connection) {
-            $this->logger->debug("New Connection");
-            self::$stats['connections']++;
-            $connection->on('close', function () {
-                self::$stats['connections']--;
+            $socket->on('error', function (Exception $e) {
+                self::$logger->exception($e);
+            });
+            $server->on('error', function (Exception $e) {
+                self::$logger->exception($e);
             });
         });
-
-        $server->listen($socket);
-
-        $socket->on('error', function (Exception $e) {
-            $this->logger->exception($e);
+        $this->worker->on("error", function (Exception $e) {
+            self::$logger->exception($e);
         });
-
-        $server->on('error', function (Exception $e) {
-            $this->logger->exception($e);
-        });
-        
-        $this->logger->debug("Server Http Created!");
-        $this->logger->info("Listen in $uri");
+        $this->worker->run();
+        self::$logger->debug("Server Http Created!");
+        self::$logger->info("Listen in $uri");
     }
 
 
-    private function loadMiddlewares()
+    private static function loadMiddlewares()
     {
         $middlewares = Loader::getClassesWithInterface("Sohris\Http\IMiddleware");
         usort($middlewares, fn ($a, $b) => $a::$priority < $b::$priority ? 1 : 0);
         return $middlewares;
     }
 
-    private function configuredMiddlewares(string $uri)
+    private static function configuredMiddlewares(string $uri)
     {
-        $middlewares = $this->loadMiddlewares();
+        $middlewares = self::loadMiddlewares();
         $configs =  Utils::getConfigFiles('http');
         $array = [
             new \React\Http\Middleware\StreamingRequestMiddleware(),
@@ -130,7 +138,7 @@ class Http extends ComponentControl
 
     public static function addTime(float $time)
     {
-        self::$stats['time']+=$time;
+        self::$stats['time'] += $time;
     }
 
     public static function addRequest()
