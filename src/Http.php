@@ -6,7 +6,9 @@ use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use React\EventLoop\Loop;
+use React\Http\HttpServer;
 use React\Http\Middleware\RequestBodyParserMiddleware;
+use React\Socket\SocketServer;
 use Sohris\Core\ComponentControl;
 use Sohris\Core\Loader;
 use Sohris\Core\Logger;
@@ -25,6 +27,9 @@ class Http extends ComponentControl
     private static Logger $logger;
     private Worker $worker;
     private Client $client;
+
+    private static SocketServer $httpsocket;
+    private static HttpServer $httpserver;
 
     private $configs = array();
 
@@ -65,36 +70,42 @@ class Http extends ComponentControl
             "base_uri" => "http://" . $uri
         ]);
         self::$logger->debug("Creating Server");
-        $this->worker = new Worker;
-        $this->worker->stayAlive();
-        $this->worker->callOnFirst(static function () use ($uri) {
-            self::$logger = new Logger("CoreHttp");
-            RouterKernel::loadRoutes();                
-            $server = new \React\Http\HttpServer(...self::configuredMiddlewares($uri));
-            $socket = new \React\Socket\SocketServer($uri);
-            // $socket->on('connection', function ($connection) {
-            //     self::$logger->debug("New Connection");
-            //     self::$stats['connections']++;
-            //     $connection->on('close', function () {
-            //         self::$stats['connections']--;
-            //     });
-            // });
-            $server->listen($socket);
+        // $this->worker = new Worker;
+        // $this->worker->stayAlive();
+        // $this->worker->callOnFirst(static function () use ($uri) {
+        self::$logger = new Logger("CoreHttp");
+        RouterKernel::loadRoutes();
+        self::$httpserver = new HttpServer(...self::configuredMiddlewares($uri));
+        self::$httpsocket = new SocketServer($uri);
+        // $socket->on('connection', function ($connection) {
+        //     self::$logger->debug("New Connection");
+        //     self::$stats['connections']++;
+        //     $connection->on('close', function () {
+        //         self::$stats['connections']--;
+        //     });
+        // });
+        self::$httpserver->listen(self::$httpsocket);
 
-            $socket->on('error', function (Exception $e) {
-                self::$logger->exception($e);
-            });
-            $server->on('error', function (Exception $e) {
-                self::$logger->exception($e);
-            });
-        });
-        $this->worker->on("error", function (Exception $e) {
+        self::$httpsocket->on('error', function (Exception $e) {
             self::$logger->exception($e);
         });
-        $this->worker->run();
+        self::$httpserver->on('error', function (Exception $e) {
+            self::$logger->exception($e);
+        });
+        // });
+
+        // $this->worker->on("error", function (Exception $e) {
+        //     self::$logger->exception($e);
+        // });
+
+        // $this->worker->callFunction(function() {
+
+        // },5);
+        // $this->worker->run();
         self::$logger->debug("Server Http Created!");
         self::$logger->info("Listen in $uri");
-        Loop::addPeriodicTimer(5, fn() => $this->checkIsUp());
+
+        // Loop::addPeriodicTimer(5, fn() => $this->checkIsUp());
     }
 
     private function checkIsUp()
