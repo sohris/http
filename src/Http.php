@@ -3,6 +3,9 @@
 namespace Sohris\Http;
 
 use Exception;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
+use React\EventLoop\Loop;
 use React\Http\Middleware\RequestBodyParserMiddleware;
 use Sohris\Core\ComponentControl;
 use Sohris\Core\Loader;
@@ -21,6 +24,7 @@ class Http extends ComponentControl
 
     private static Logger $logger;
     private Worker $worker;
+    private Client $client;
 
     private $configs = array();
 
@@ -56,6 +60,10 @@ class Http extends ComponentControl
         $port = $this->configs['port'];
         $url = $this->configs['host'];
         $uri = ($url == 'localhost' ? "0.0.0.0:$port" : "$url:$port");
+
+        $this->client = new Client([
+            "base_uri" => "http://" . $uri
+        ]);
         self::$logger->debug("Creating Server");
         $this->worker = new Worker;
         $this->worker->stayAlive();
@@ -86,8 +94,24 @@ class Http extends ComponentControl
         $this->worker->run();
         self::$logger->debug("Server Http Created!");
         self::$logger->info("Listen in $uri");
+        Loop::addPeriodicTimer(5, fn() => $this->checkIsUp());
     }
 
+    private function checkIsUp()
+    {
+        try {
+            $this->client->get("/", ['timeout' => 5]);
+        } catch (GuzzleException $e) {
+            if (empty($e->getCode())) {
+                $this->restart();
+            }
+        }
+    }
+
+    public function restart()
+    {
+        $this->worker->restart();
+    }
 
     private static function loadMiddlewares()
     {
