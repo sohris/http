@@ -26,27 +26,40 @@ class Error
     {
 
         try {
-            return resolve($next($request));         
-        }catch (StatusHTTPException $e) {
+            return resolve($next($request))->then(null, function (Exception $e) use ($request) {
+                $message = $request->getMethod() . " " . $e->getCode() . " " .  $request->getRequestTarget() . " - " . $e->getMessage() . " (File: " . $e->getFile() . " Line: " . $e->getLine() . ")";
+                if (strpos(50, chr($e->getCode())))
+                    $this->logger->critical($message, array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
+                else
+                    $this->logger->info($message, array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
+                return new Response(
+                    500,
+                    array(
+                        'Content-Type' => 'application/json'
+                    ),
+                    json_encode(array("status" => "error", "code" => $e->getCode(), "message" => $e->getMessage()))
+                );
+            });
+        } catch (StatusHTTPException $e) {
             $message = $request->getMethod() . " " . $e->getCode() . " " .  $request->getRequestTarget() . " - " . $e->getMessage() . " (File: " . $e->getFile() . " Line: " . $e->getLine() . ")";
             if (strpos(50, chr($e->getCode())))
                 $this->logger->critical($message, array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
             else
                 $this->logger->info($message, array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
-            return new Response(                
+            return new Response(
                 $e->getCode(),
                 array(
                     'Content-Type' => 'application/json'
                 ),
                 json_encode(array("status" => "error", "code" => $e->getCode(), "message" => $e->getMessage()))
             );
-        }catch (Throwable $e) {
+        } catch (Throwable $e) {
             $message = $request->getMethod() . " " . $e->getCode() . " " .  $request->getRequestTarget() . " - " . $e->getMessage() . " (File: " . $e->getFile() . " Line: " . $e->getLine() . ")";
             if (strpos(50, chr($e->getCode())))
                 $this->logger->critical($message, array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
             else
                 $this->logger->info($message, array_map(fn ($trace) => "File : $trace[file] (Line $trace[line])", array_slice($e->getTrace(), 0, 3)));
-            return new Response(                
+            return new Response(
                 500,
                 array(
                     'Content-Type' => 'application/json'
