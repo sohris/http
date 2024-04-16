@@ -1,3 +1,5 @@
 /vendor/
 /test/
 log/
+app.php
+bootstrap.php

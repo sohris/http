@@ -18,7 +18,7 @@ class Http extends ComponentControl
 {
     private $module_name = "Sohris_Http";
 
-    private $logger;
+    private Logger $logger;
 
     private $configs = array();
 
@@ -84,7 +84,7 @@ class Http extends ComponentControl
     private function loadMiddlewares()
     {
         $middlewares = Loader::getClassesWithInterface("Sohris\Http\IMiddleware");
-        usort($middlewares, fn ($a, $b) => $a::$priority < $b::$priority);
+        usort($middlewares, fn ($a, $b) => $a::$priority < $b::$priority ? 1 : 0);
         return $middlewares;
     }
 
