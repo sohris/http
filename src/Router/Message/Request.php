@@ -12,9 +12,9 @@ use React\Stream\ReadableStreamInterface;
 
 final class Request extends AbstractRequest implements RequestInterface
 {
-    public array $REQUEST = [];
-    public array $SESSION = [];
-    public array $FILES = [];
+    public $REQUEST = [];
+    public $SESSION = [];
+    public $FILES = [];
 
     public function __construct(
         $method,
