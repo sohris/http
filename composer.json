@@ -18,8 +18,7 @@
         "mnavarrocarter/path-to-regexp-php": "^1.0",
         "firebase/php-jwt": "^6.0",
         "react/stream": "^1.2",
-        "guzzlehttp/guzzle": "^7.4",
-        "openswoole/core": "22.1.5"
+        "guzzlehttp/guzzle": "^7.4"
     },
     "autoload": {
         "psr-4": {
