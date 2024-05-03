@@ -1,10 +1,10 @@
 <?php
 namespace Sohris\Http;
 
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\RequestInterface;
 
 
 interface IMiddleware
 {
-    public function __invoke(ServerRequestInterface $request, \Closure $next);   
+    public function __invoke(RequestInterface $request, \Closure $next);   
 }

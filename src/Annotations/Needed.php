@@ -4,7 +4,7 @@
 
 namespace Sohris\Http\Annotations;
 
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\RequestInterface;
 use GuzzleHttp\Psr7\UploadedFile;
 use Sohris\Http\Exceptions\StatusHTTPException;
 
@@ -38,7 +38,7 @@ class Needed
         return $this->needed == $params;
     }
 
-    public function getNeededInRequest(ServerRequestInterface $request)
+    public function getNeededInRequest(RequestInterface $request)
     {
         $needed = [];
         $content_type = $request->getHeader("Content-Type");
@@ -85,7 +85,7 @@ class Needed
         return $filtered;
     }
 
-    public static function getFilesInRequest(ServerRequestInterface $request)
+    public static function getFilesInRequest(RequestInterface $request)
     {
         $content_type = $request->getHeader("Content-Type");
         if (empty($content_type))

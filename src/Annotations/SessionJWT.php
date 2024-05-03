@@ -6,7 +6,7 @@ namespace Sohris\Http\Annotations;
 use Exception;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\RequestInterface;
 use RingCentral\Psr7\Request;
 use Sohris\Core\Utils as CoreUtils;
 use Sohris\Http\Exceptions\StatusHTTPException;
@@ -39,7 +39,7 @@ class SessionJWT
         return $this->auth;
     }
 
-    public static function getSession(ServerRequestInterface $request)
+    public static function getSession(RequestInterface $request)
     {
         if (empty($request->getHeader('Authorization')))
             throw new StatusHTTPException("Not Authorized", 403);

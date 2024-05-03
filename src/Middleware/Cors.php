@@ -6,7 +6,7 @@ use function React\Promise\resolve;
 use Neomerx\Cors\Analyzer;
 use Neomerx\Cors\Contracts\AnalysisResultInterface;
 use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\RequestInterface;
 use React\Http\Message\Response;
 use Sikei\React\Http\Middleware\CorsMiddlewareAnalysisStrategy as Strategy;
 use Sikei\React\Http\Middleware\CorsMiddlewareConfiguration as Config;
@@ -28,7 +28,7 @@ class Cors
     }
 
     /**
-     * @param DBSnoopRequest|ServerRequestInterface $request
+     * @param DBSnoopRequest|RequestInterface $request
      * @return ResponseInterface
      */
     public function __invoke($request, $next)

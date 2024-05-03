@@ -2,7 +2,7 @@
 
 namespace Sohris\Http\Middleware;
 
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\RequestInterface;
 use Closure;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -22,7 +22,7 @@ class Logger
         $this->logger = new CLogger('CoreHttp');
     }
 
-    public function __invoke(ServerRequestInterface $request, Closure $next)
+    public function __invoke(RequestInterface $request, Closure $next)
     {
         $start = Utils::microtimeFloat();
         Http::addRequest();

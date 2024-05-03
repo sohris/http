@@ -2,7 +2,7 @@
 
 namespace Sohris\Http\Middleware;
 
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\RequestInterface;
 use Closure;
 use Exception;
 use React\Http\Message\Response;
@@ -22,7 +22,7 @@ class Error
         $this->logger = new Logger('CoreHttp');
     }
 
-    public function __invoke(ServerRequestInterface $request, Closure $next = null)
+    public function __invoke(RequestInterface $request, Closure $next = null)
     {
 
         try {
