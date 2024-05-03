@@ -3,7 +3,7 @@
 namespace Sohris\Http\Router;
 
 use Exception;
-use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use React\Http\Message\Response;
 use RingCentral\Psr7\Request;
@@ -59,7 +59,7 @@ class Kernel
         return sizeof(self::$router_map);
     }
 
-    public static function getSessionJWT(string $route_hash, ServerRequestInterface $request)
+    public static function getSessionJWT(string $route_hash, RequestInterface $request)
     {
         $class = self::getClassOfRoute($route_hash);
         if (isset($class->session_jwt) && $class->session_jwt->needAuthorization()) {
@@ -68,7 +68,7 @@ class Kernel
         return null;
     }
 
-    public static function validNeeded(ServerRequestInterface &$request, $route_hash)
+    public static function validNeeded(RequestInterface &$request, $route_hash)
     {
         $class = self::getClassOfRoute($route_hash);
         $request->REQUEST = [];
@@ -77,7 +77,7 @@ class Kernel
         $request->FILES = Needed::getFilesInRequest($request);
     }
 
-    public static function callRoute(ServerRequestInterface $request, $route_hash)
+    public static function callRoute(RequestInterface $request, $route_hash)
     {
         $class = self::getClassOfRoute($route_hash);
         $handler = $class->callable;
