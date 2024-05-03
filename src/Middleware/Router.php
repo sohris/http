@@ -3,7 +3,6 @@
 namespace Sohris\Http\Middleware;
 
 use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\RequestInterface;
 use Sohris\Http\Router\Kernel;
 use Sohris\Http\Router\Message\Request;
 use Sohris\Http\Utils;
