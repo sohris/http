@@ -23,13 +23,17 @@ class Cors
     public function __construct()
     {
         $system_config = Utils::getConfigFiles('http')['cors_config'];
+        $host = Utils::getConfigFiles('system')['bhostname'];
+        $exploded = explode("://", $host);
+        $exploded2 = explode(":", $exploded[1]);
         $this->config = new Settings();
         $this->config
-            ->setAllowedOrigins(is_array($system_config['allow_origin'])?$system_config['allow_origin']: [$system_config['allow_origin']])
+            ->setServerOrigin($exploded[0], $exploded2[0], $exploded2[1] ? $exploded2[1] : ($exploded[0] == "https" ? "443" : "80"))
+            ->setAllowedOrigins(is_array($system_config['allow_origin']) ? $system_config['allow_origin'] : [$system_config['allow_origin']])
             ->setAllowedMethods($system_config['allow_methods'])
             ->setAllowedHeaders($system_config['allow_headers'])
             ->setExposedHeaders($system_config['expose_headers'])
-            ->enableCheckHost()
+            ->disableCheckHost()
             ->setCredentialsSupported()
             ->setPreFlightCacheMaxAge($system_config['max_age'])
             ->setLogger(new Logger("HttpCors"));
