@@ -29,6 +29,7 @@ class Cors
             ->setAllowedMethods($system_config['allow_methods'])
             ->setAllowedHeaders($system_config['allow_headers'])
             ->setExposedHeaders($system_config['expose_headers'])
+            ->enableCheckHost()
             ->setCredentialsSupported()
             ->setPreFlightCacheMaxAge($system_config['max_age'])
             ->setLogger(new Logger("HttpCors"));
