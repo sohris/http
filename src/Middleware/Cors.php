@@ -25,7 +25,7 @@ class Cors
         $system_config = Utils::getConfigFiles('http')['cors_config'];
         $this->config = new Settings();
         $this->config
-            ->setAllowedOrigins($system_config['allow_origin'])
+            ->setAllowedOrigins(is_array($system_config['allow_origin'])?$system_config['allow_origin']: [$system_config['allow_origin']])
             ->setAllowedMethods($system_config['allow_methods'])
             ->setAllowedHeaders($system_config['allow_headers'])
             ->setExposedHeaders($system_config['expose_headers'])
