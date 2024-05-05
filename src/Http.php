@@ -136,6 +136,7 @@ class Http extends ComponentControl
         $middlewares = self::loadMiddlewares();
         $configs =  Utils::getConfigFiles('http');
         $array = [
+            new Cors($configs['cors_config']),
             new \React\Http\Middleware\StreamingRequestMiddleware(),
             new \React\Http\Middleware\LimitConcurrentRequestsMiddleware($configs['max_concurrent_requests']),
             new \React\Http\Middleware\RequestBodyBufferMiddleware(2 * 1024 * 1024),
@@ -143,7 +144,6 @@ class Http extends ComponentControl
             new RequestBodyParserMiddleware($configs['upload_files_size'], $configs['max_upload_files']),
             new MiddlewareLogger($uri),
             new Error,
-            new Cors($configs['cors_config']),
         ];
         foreach ($middlewares as $middleware) {
             array_push($array, new $middleware());

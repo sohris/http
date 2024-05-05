@@ -28,7 +28,7 @@ class Cors
         $exploded2 = explode(":", $exploded[1]);
         $this->config = new Settings();
         $this->config
-            ->setServerOrigin($exploded[0], $exploded2[0], $exploded2[1] ? $exploded2[1] : ($exploded[0] == "https" ? "443" : "80"))
+            ->setServerOrigin($exploded[0], $exploded2[0], isset($exploded2[1]) ? $exploded2[1] : ($exploded[0] == "https" ? "443" : "80"))
             ->enableAddAllowedHeadersToPreFlightResponse()
             ->enableAddAllowedMethodsToPreFlightResponse()
             ->enableAllOriginsAllowed()
