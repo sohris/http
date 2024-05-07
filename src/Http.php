@@ -15,6 +15,7 @@ use Sohris\Core\Logger;
 use Sohris\Core\Tools\Worker\Worker;
 use Sohris\Core\Utils;
 use Sohris\Http\Middleware\Cors;
+use Sohris\Http\Middleware\Debug;
 use Sohris\Http\Middleware\Error;
 use Sohris\Http\Middleware\Logger as MiddlewareLogger;
 use Sohris\Http\Middleware\Router;
@@ -119,6 +120,7 @@ class Http extends ComponentControl
         $middlewares = self::loadMiddlewares();
         $configs =  Utils::getConfigFiles('http');
         $array = [
+            new Debug,
             new Cors($configs['cors_config']),
             new \React\Http\Middleware\StreamingRequestMiddleware(),
             new \React\Http\Middleware\LimitConcurrentRequestsMiddleware($configs['max_concurrent_requests']),
