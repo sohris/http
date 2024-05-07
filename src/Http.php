@@ -31,9 +31,11 @@ class Http extends ComponentControl
     private static SocketServer $httpsocket;
     private static HttpServer $httpserver;
 
+    public static int $current_connections = 0;
+
     private $configs = array();
 
-    private $uptime;
+    private static $uptime;
 
     private static $stats = [
         'requests' => 0,
@@ -43,7 +45,7 @@ class Http extends ComponentControl
 
     public function __construct()
     {
-        $this->uptime = time();
+        self::$uptime = time();
         $this->configs = Utils::getConfigFiles('http');
         self::$logger = new Logger('CoreHttp');
     }
@@ -70,53 +72,34 @@ class Http extends ComponentControl
             "base_uri" => "http://" . $uri
         ]);
         self::$logger->debug("Creating Server");
-        // $this->worker = new Worker;
-        // $this->worker->stayAlive();
-        // $this->worker->callOnFirst(static function () use ($uri) {
         self::$logger = new Logger("CoreHttp");
         RouterKernel::loadRoutes();
         self::$httpserver = new HttpServer(...self::configuredMiddlewares($uri));
         self::$httpsocket = new SocketServer($uri);
-        // $socket->on('connection', function ($connection) {
-        //     self::$logger->debug("New Connection");
-        //     self::$stats['connections']++;
-        //     $connection->on('close', function () {
-        //         self::$stats['connections']--;
-        //     });
-        // });
+        self::$httpsocket->on('connection', function ($connection) {
+            $address = $connection->getRemoteAddress();
+            $ip = trim(parse_url($address, PHP_URL_HOST), '[]');
+            $address2 = $connection->getLocalAddress();
+            self::$logger->debug("New Connection $ip <-> $address2");
+            self::$stats['connections']++;
+            $connection->on('close', function () {
+                self::$stats['connections']--;
+            });
+            $connection->on('error', function (Exception $e) {
+                self::$logger->exception($e);
+            });
+        });
         self::$httpserver->listen(self::$httpsocket);
-
         self::$httpsocket->on('error', function (Exception $e) {
             self::$logger->exception($e);
         });
         self::$httpserver->on('error', function (Exception $e) {
             self::$logger->exception($e);
         });
-        // });
 
-        // $this->worker->on("error", function (Exception $e) {
-        //     self::$logger->exception($e);
-        // });
-
-        // $this->worker->callFunction(function() {
-
-        // },5);
-        // $this->worker->run();
         self::$logger->debug("Server Http Created!");
         self::$logger->info("Listen in $uri");
 
-        // Loop::addPeriodicTimer(5, fn() => $this->checkIsUp());
-    }
-
-    private function checkIsUp()
-    {
-        try {
-            $this->client->get("/", ['timeout' => 5]);
-        } catch (GuzzleException $e) {
-            if (empty($e->getCode())) {
-                $this->restart();
-            }
-        }
     }
 
     public function restart()
@@ -157,9 +140,9 @@ class Http extends ComponentControl
         return $this->module_name;
     }
 
-    public function getStats()
+    public static function getStats()
     {
-        $uptime = time() - $this->uptime;
+        $uptime = time() - self::$uptime;
         $stats = [
             'uptime' => $uptime,
             'requests' => self::$stats['requests'],
