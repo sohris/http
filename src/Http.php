@@ -151,7 +151,7 @@ class Http extends ComponentControl
             'requests_per_sec' => round(self::$stats['requests'] / $uptime, 3),
             'time' => self::$stats['time'],
             'active_connections' => self::$stats['connections'],
-            'avg_time_request' => self::$stats['request'] > 0 ? round(self::$stats['time'] / self::$stats['request'], 3) : 0
+            'avg_time_request' => self::$stats['requests'] > 0 ? round(self::$stats['time'] / self::$stats['request'], 3) : 0
         ];
         return $stats;
     }
